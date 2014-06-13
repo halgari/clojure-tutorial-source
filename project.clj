@@ -8,4 +8,5 @@
                  [org.zeromq/jeromq "0.3.4"]
                  [cheshire "5.3.1"]
                  [http-kit "2.1.16"]
-                 [org.clojure/data.xml "0.0.7"]])
+                 [org.clojure/data.xml "0.0.7"]
+                 [medley "0.2.1"]])
