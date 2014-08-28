@@ -1,4 +1,4 @@
-(ns logic-tutorials.episode2
+(ns mu-kanren-transducers
   (:refer-clojure :exclude [==]))
 
 (defn lvar
@@ -27,28 +27,17 @@
       :else (and (= u v) s))))
 
 (defn == [a b]
-  (fn [s]
-    (if-let [v (unify s a b)]
-      [v]
-      [])))
+  (keep (fn [s]
+          (if-let [v (unify s a b)]
+            v
+            nil))))
 
-(defn -conj
-  ([a] a)
-  ([a b]
-   (fn [s]
-     (for [aret (a s)
-           :when aret
-           bret (b aret)
-           :when bret]
-       bret)))
-  ([a b & more]
-   (-conj a (apply -conj b more))))
+(def -conj comp)
 
 (defn -disj [& goals]
-  (fn [s]
-    (mapcat (fn [goal]
-              (goal s))
-            goals)))
+  (flatmap (fn [s]
+             (mapcat #(do (println ".")
+                          (sequence % [s])) goals))))
 
 (defmacro fresh [lvars & body]
   `(let [~@(mapcat (fn [x]
@@ -56,18 +45,18 @@
                    lvars)]
      (-conj ~@body)))
 
-(defn reify-lvar [results lvars]
-  (for [result results]
-    (map (partial walk result) lvars)))
+(defn reify-lvars [lvars]
+  (map
+    (fn [s]
+      (mapv #(walk s %) lvars))))
 
 
 (defmacro run [lvars & body]
   `(let [~@(mapcat (fn [x]
                      `[~x (lvar ~(name x))])
                    lvars)
-         v# [~@lvars]
-         result# ((-conj ~@body) {})]
-     (reify-lvar result# v#)))
+         v# [~@lvars]]
+     (comp (-conj ~@body) (reify-lvars v#) )))
 
 (defn conde [& goals]
   (apply -disj (map (partial apply -conj) goals)))
@@ -78,18 +67,16 @@
     [(== a 1)]
     [(== b 1)]))
 
-(run [a b]
-     (foo a b)
-     (== a b))
+(def empty-env [{}])
 
+(def program (run [a b]
+                   (conde
+                     [(== a 1)]
+                     [(== a 42)])
+                   (conde
+                     [(== b 2)]
+                     [(== b 1)])))
 
+(second (sequence program empty-env))
 
-(dotimes [x 100]
-  (time (dotimes [x 1000]
-          (doall (run [a b]
-                      (conde
-                        [(== a 1)]
-                        [(== a 42)])
-                      (conde
-                        [(== b 2)]
-                        [(== b 1)]))))))
+(iteration program empty-env)
