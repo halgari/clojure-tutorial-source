@@ -50,11 +50,6 @@
            ))
 
 
-
-(reduce (rfn +)
-        0
-        data)
-
 (defn string-rf
   ([^StringBuilder acc ^Character ch]
    (.append acc ch)))
@@ -73,13 +68,6 @@
    (conj! acc val)))
 
 (transduce xform vec-trans "Hello World")
-
-(let [f (rfn string-rf)]
-  (f (reduce f (f) "Hello World")))
-
-(str (reduce (rfn string-rf)
-             (StringBuilder.)
-             "Hello World"))
 
 
 (extend-protocol clojure.core.protocols/CollReduce
@@ -106,6 +94,72 @@
            conj
            (java.io.ByteArrayInputStream.
              (.getBytes "Hello World")))
+
+(defn preserving-reduced
+  [f1]
+  #(let [ret (f1 %1 %2)]
+    (if (reduced? ret)
+      (reduced ret)
+      ret)))
+
+(def cat
+  (fn [xf]
+    (let [pr (preserving-reduced xf)]
+      (fn
+        ([] (xf))
+        ([result] (xf result))
+        ([result coll]
+          (reduce pr result coll))))))
+
+(def print-stuff
+  (map (fn [x]
+         (print "-" x "-")
+         x)))
+
+
+(defn take [n]
+  (fn [xf]
+    (let [left (volatile! n)]
+      (fn
+        ([] (xf))
+        ([result] (xf result))
+        ([result item]
+          (if (> @left 0)
+            (do (vswap! left dec)
+                (xf result item))
+            (reduced result)))))))
+
+(type (sequence (map inc) [1 2 3 4]))
+
+(def xform (comp
+             (filter even?)
+             (partition-all 2)
+             cat
+             (map str))
+
+(def a (atom [])))
+
+(def rf
+  (fn [_ item]
+    (swap! a conj item)))
+
+(def f (xform rf))
+
+(reset! a [])
+
+(pr @a)
+
+(f nil 3)
+
+(let [val 4]
+  (reset! a [])
+  (f nil val)
+  @a)
+
+(chan 10 xform)
+
+
+
 
 
 
