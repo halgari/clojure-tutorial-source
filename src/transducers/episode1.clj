@@ -161,8 +161,16 @@
 
 
 
+(require '[clojure.core.async :as async])
 
-
+(let [c (async/chan 1 (map (fn [x]
+                             (assert (odd? x))
+                             x))
+                    (fn [ex]
+                      (println ex)
+                      :error))]
+  (async/>!! c 2)
+  (async/<!! c))
 
 
 
