@@ -59,7 +59,8 @@
   ([^StringBuilder sb]
    (.toString sb))
   ([^StringBuilder sb ^Character ch]
-   (.append sb ch)))
+   (.append sb ch)
+    sb))
 
 (defn vec-trans
   ([] (transient []))
@@ -173,6 +174,46 @@
   (async/<!! c))
 
 
+
+
+(transduce (partition-all 2)
+           conj
+           "abcdefg")
+
+
+(defn split-with [pred xform rf]
+  (fn [xf]
+    (let [at-start? (volatile! true)
+          acc (volatile! (rf))
+          f (volatile! (xform rf))
+          reset-state! (fn []
+                         (vreset! at-start? true)
+                         (let [state (@f @acc)]
+                           (vreset! f (xform rf))
+                           (vreset! acc (@f))
+                           state))]
+      (reset-state!)
+      (fn
+        ([] (xf))
+        ([result] (if @at-start?
+                    (xf result)
+                    (xf (xf result (reset-state!)))))
+        ([result item]
+          (if (pred item)
+            (xf result (reset-state!))
+            (do (vswap! acc @f item)
+                (vreset! at-start? false)
+                result)))))))
+
+
+(transduce (split-with #(= \newline %)
+                       (split-with
+                         #(= \| %)
+                         (map identity)
+                         string-rf)
+                       vec-trans)
+           vec-trans
+           "this|is|a|test\nthis2|is2|a2|test2\n")
 
 
 

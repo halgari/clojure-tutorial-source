@@ -34,10 +34,28 @@
 
 (def -conj comp)
 
+(defn foreach-xform [& xforms]
+  (fn [xf]
+    (let [xform-term (fn
+                       ([result] result)
+                       ([result value] (xf result value)))
+          xforms (mapv #(% xform-term) xforms)]
+      (fn
+        ([] (xf))
+        ([result] (let [result (reduce
+                                 (fn [acc f]
+                                   (f acc))
+                                 result
+                                 xforms)]
+                    (xf result)))
+        ([result val]
+         (reduce (fn [acc f]
+                   (f acc val))
+                 result
+                 xforms))))))
+
 (defn -disj [& goals]
-  (flatmap (fn [s]
-             (mapcat #(do (println ".")
-                          (sequence % [s])) goals))))
+  (apply foreach-xform goals))
 
 (defmacro fresh [lvars & body]
   `(let [~@(mapcat (fn [x]
